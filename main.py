@@ -5,6 +5,9 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 
+from src.conversion.id import handle_id
+from src.conversion.layers import handle_layers
+
 app = FastAPI()
 
 
@@ -22,12 +25,12 @@ async def read_root() -> dict[str, str]:
 
 @app.post(path="/v1/layers")
 def create_layer() -> dict[str, str]:
-    return {"status": "queued"}
+    return handle_layers()
 
 
-@app.post(path="/v1/mws")
+@app.post(path="/v1/ids")
 def create_mws() -> dict[str, str]:
-    return {"status": "queued"}
+    return handle_id()
 
 
 if __name__ == "__main__":
