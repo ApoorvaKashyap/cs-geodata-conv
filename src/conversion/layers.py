@@ -1,5 +1,6 @@
 from loguru import logger
 
+from src.utils.rand_funcs import sim_work
 from src.work.work_queue import lq
 
 
@@ -14,3 +15,4 @@ def handle_layers() -> dict:
 
 def layer_conversion() -> None:
     logger.info("Converting layers to a different format")
+    sim_work()

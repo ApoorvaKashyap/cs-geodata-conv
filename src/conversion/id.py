@@ -1,5 +1,6 @@
 from loguru import logger
 
+from src.utils.rand_funcs import sim_work
 from src.work.work_queue import iq
 
 
@@ -14,3 +15,4 @@ def handle_id() -> dict:
 
 def id_conversion() -> None:
     logger.info("Converting ids to a different format")
+    sim_work()

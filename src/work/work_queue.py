@@ -16,3 +16,12 @@ iq = Queue(
         host=sysconfig.get("redis", "host"), port=sysconfig.getint("redis", "port")
     ),
 )
+
+
+def get_status(task_id: str) -> dict[str, str]:
+    task = lq.fetch_job(task_id)
+    if not task:
+        task = iq.fetch_job(task_id)
+    if not task:
+        return {"status": "not found"}
+    return {"status": task._status}

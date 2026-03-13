@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from src.conversion.id import handle_id
 from src.conversion.layers import handle_layers
+from src.work.work_queue import get_status
 
 app = FastAPI()
 
@@ -31,6 +32,11 @@ def create_layer() -> dict[str, str]:
 @app.post(path="/v1/ids")
 def create_mws() -> dict[str, str]:
     return handle_id()
+
+
+@app.get(path="/v1/status")
+def get_jobstatus(task_id: str) -> dict[str, str]:
+    return get_status(task_id)
 
 
 if __name__ == "__main__":
