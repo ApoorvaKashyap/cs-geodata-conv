@@ -1,13 +1,8 @@
-from redis import Redis
 from rq import Worker
 
-from src.utils.configs import sysconfig
+from src.utils.redis_client import get_redis_client
 
-wredis = Redis(
-    host=sysconfig.get("redis", "host"), port=sysconfig.getint("redis", "port")
-)
-
-w = Worker(["layers", "id"], connection=wredis)
+w = Worker(["layers", "id"], connection=get_redis_client())
 
 if __name__ == "__main__":
     w.work()

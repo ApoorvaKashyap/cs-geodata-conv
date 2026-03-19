@@ -1,17 +1,12 @@
 # import requests
 from collections.abc import Awaitable
 
-from redis import Redis
 from rq import Worker
 
-from src.utils.configs import sysconfig
+from src.utils.redis_client import get_redis_client
 from src.work.work_queue import iq, lq
 
-client = Redis(
-    host=sysconfig.get("redis", "host"),
-    port=sysconfig.getint("redis", "port"),
-    socket_connect_timeout=3,
-)
+client = get_redis_client()
 
 
 def check_redis_connection() -> Awaitable[bool] | bool:

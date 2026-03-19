@@ -1,6 +1,4 @@
 """
-create_flat_parquet.py
-
 Converts a folder of geospatial JSON files into a single flat Parquet file.
 
 Expected files in the input folder (one of each pattern):
@@ -30,14 +28,14 @@ Usage:
     python create_flat_parquet.py /path/to/folder
 """
 
-import os
-import sys
 import glob
-import re
 import json
+import os
+import re
+import sys
+
 import duckdb
 from loguru import logger
-
 
 # ---------------------------------------------------------------------------
 # FILE PATTERNS
@@ -65,7 +63,7 @@ COLS_TO_DROP = {"id", "newcode43"}
 # ===========================================================================
 
 
-def get_folder_path(passed_path=None):
+def get_folder_path(passed_path: str | None = None) -> str:
     # 1. Use the path if we passed it from the worker
     if passed_path:
         return passed_path
@@ -78,7 +76,7 @@ def get_folder_path(passed_path=None):
     return input("Enter the path to the folder: ").strip()
 
 
-def setup_output_dir(folder_path):
+def setup_output_dir(folder_path: str) -> tuple[str, str]:
     """
     Create and return <folder_path>/parquet/ as the output directory.
     Also return the final parquet output file path.
@@ -90,7 +88,7 @@ def setup_output_dir(folder_path):
     return output_dir, output_file
 
 
-def init_duckdb():
+def init_duckdb() -> duckdb.DuckDBPyConnection:
     """
     Create a DuckDB in-memory connection with the spatial extension loaded.
     """
@@ -105,7 +103,7 @@ def init_duckdb():
 # ===========================================================================
 
 
-def find_file(folder_path, pattern):
+def find_file(folder_path: str, pattern: str) -> str:
     """
     Return the first file path matching <folder_path>/<pattern>.
     Raises FileNotFoundError if no match is found.
@@ -124,7 +122,7 @@ def find_file(folder_path, pattern):
     return matches[0].replace("\\", "/")
 
 
-def validate_required_files(folder_path):
+def validate_required_files(folder_path: str) -> dict[str, dict[str, str]]:
     """
     Verify that every required file pattern has at least one match.
     Returns a dict: {label: {"path": ..., "prefix": ...}}.
@@ -158,7 +156,9 @@ def validate_required_files(folder_path):
 # ===========================================================================
 
 
-def load_geojson_to_table(con, file_path, table_name):
+def load_geojson_to_table(
+    con: duckdb.DuckDBPyConnection, file_path: str, table_name: str
+) -> None:
     """
     Load a GeoJSON / JSON file via ST_READ into a named DuckDB table.
     """
@@ -167,21 +167,28 @@ def load_geojson_to_table(con, file_path, table_name):
     )
 
 
-def get_table_columns(con, table_name):
+def get_table_columns(con: duckdb.DuckDBPyConnection, table_name: str) -> list[str]:
     """
     Return a list of column names present in the given DuckDB table.
     """
     return con.execute(f"PRAGMA table_info({table_name})").df()["name"].tolist()
 
 
-def detect_columns_by_pattern(con, table_name, regex):
+def detect_columns_by_pattern(
+    con: duckdb.DuckDBPyConnection, table_name: str, regex: re.Pattern[str]
+) -> list[str]:
     """
     Return column names from <table_name> whose names match the compiled regex.
     """
     return [c for c in get_table_columns(con, table_name) if regex.match(c)]
 
 
-def column_type_contains(con, table_name, column_name, keyword):
+def column_type_contains(
+    con: duckdb.DuckDBPyConnection,
+    table_name: str,
+    column_name: str,
+    keyword: str,
+) -> bool:
     """
     Return True if the DuckDB type of the column contains keyword (case-insensitive).
     """
@@ -191,7 +198,9 @@ def column_type_contains(con, table_name, column_name, keyword):
     return False
 
 
-def detect_json_metrics(con, table_name, sample_column):
+def detect_json_metrics(
+    con: duckdb.DuckDBPyConnection, table_name: str, sample_column: str
+) -> list[str]:
     """
     Inspect one cell of <sample_column> in <table_name> and return the list of
     metric keys stored inside that JSON / struct cell.
@@ -216,7 +225,7 @@ def detect_json_metrics(con, table_name, sample_column):
     return []
 
 
-def safe_prefix(col_name, prefix):
+def safe_prefix(col_name: str, prefix: str) -> str:
     """
     Return <prefix>_<col_name> only if col_name does not already start with
     <prefix>_. This prevents double-prefixing like df_df_2024_2025_DeltaG.
@@ -226,7 +235,9 @@ def safe_prefix(col_name, prefix):
     return f"{prefix}_{col_name}"
 
 
-def drop_unwanted_cols(con, src_table, out_table):
+def drop_unwanted_cols(
+    con: duckdb.DuckDBPyConnection, src_table: str, out_table: str
+) -> list[str]:
     """
     Copy <src_table> to <out_table> while silently dropping every column
     listed in COLS_TO_DROP that actually exists in the source table.
@@ -244,7 +255,12 @@ def drop_unwanted_cols(con, src_table, out_table):
     return get_table_columns(con, out_table)
 
 
-def apply_prefix_to_unique_cols(con, src_table, prefix, out_table):
+def apply_prefix_to_unique_cols(
+    con: duckdb.DuckDBPyConnection,
+    src_table: str,
+    prefix: str,
+    out_table: str,
+) -> str:
     """
     Rename columns that are NOT in GLOBAL_COLS by conditionally prepending
     <prefix>_ (skipped if the column already starts with <prefix>_).
@@ -274,7 +290,14 @@ def apply_prefix_to_unique_cols(con, src_table, prefix, out_table):
     return out_table
 
 
-def flatten_nested_columns(con, src_table, nested_cols, metrics, prefix, out_table):
+def flatten_nested_columns(
+    con: duckdb.DuckDBPyConnection,
+    src_table: str,
+    nested_cols: list[str],
+    metrics: list[str],
+    prefix: str,
+    out_table: str,
+) -> str:
     """
     Expand nested JSON / STRUCT columns into individual numeric columns.
 
@@ -282,7 +305,8 @@ def flatten_nested_columns(con, src_table, nested_cols, metrics, prefix, out_tab
     created. The alias is built with safe_prefix to prevent double-prefixing:
         safe_prefix("<nested_col>_<metric>", prefix)
     e.g. for prefix="df" and col="df_2024_2025":
-        safe_prefix("df_2024_2025_DeltaG", "df") -> "df_2024_2025_DeltaG"  (no double df_)
+        safe_prefix("df_2024_2025_DeltaG", "df") -> "df_2024_2025_DeltaG"
+        (no double df_)
 
     The original nested columns are excluded from the output.
     All other columns (including global ones) are kept as-is.
@@ -338,7 +362,9 @@ def flatten_nested_columns(con, src_table, nested_cols, metrics, prefix, out_tab
 # ---------------------------------------------------------------------------
 
 
-def transform_aquifer(con, file_path, prefix="aq"):
+def transform_aquifer(
+    con: duckdb.DuckDBPyConnection, file_path: str, prefix: str = "aq"
+) -> str:
     """
     Load and transform the aquifer layer.
 
@@ -413,33 +439,46 @@ def transform_aquifer(con, file_path, prefix="aq"):
             {globals_sql}
             {unique_sql}
             -- avg_mbgl "X-Y" -> aq_avg_mbgl_min, aq_avg_mbgl_max
-            CAST(SPLIT_PART("avg_mbgl", '-', 1) AS FLOAT)                    AS "{p}_avg_mbgl_min",
-            CAST(SPLIT_PART("avg_mbgl", '-', 2) AS FLOAT)                    AS "{p}_avg_mbgl_max",
+            -- avg_mbgl "X-Y" -> aq_avg_mbgl_min, aq_avg_mbgl_max
+            CAST(SPLIT_PART("avg_mbgl", '-', 1) AS FLOAT)
+                AS "{p}_avg_mbgl_min",
+            CAST(SPLIT_PART("avg_mbgl", '-', 2) AS FLOAT)
+                AS "{p}_avg_mbgl_max",
 
             -- m2_perday "upto X" -> aq_m2_per_day_max
             CAST(
                 REPLACE(SPLIT_PART("m2_perday", 'upto ', 2), 'upto ', '')
-            AS FLOAT)                                                          AS "{p}_m2_per_day_max",
+            AS FLOAT) AS "{p}_m2_per_day_max",
 
             -- m3_per_day "X to Y" -> aq_m3_per_day_min, aq_m3_per_day_max
-            CAST(SPLIT_PART("m3_per_day", ' to', 1) AS FLOAT)                AS "{p}_m3_per_day_min",
-            CAST(SPLIT_PART("m3_per_day", ' to', 2) AS FLOAT)                AS "{p}_m3_per_day_max",
+            CAST(SPLIT_PART("m3_per_day", ' to', 1) AS FLOAT)
+                AS "{p}_m3_per_day_min",
+            CAST(SPLIT_PART("m3_per_day", ' to', 2) AS FLOAT)
+                AS "{p}_m3_per_day_max",
 
             -- mbgl "X - Y" -> aq_mbgl_min, aq_mbgl_max
-            CAST(SPLIT_PART("mbgl", ' -', 1) AS FLOAT)                       AS "{p}_mbgl_min",
-            CAST(SPLIT_PART("mbgl", ' -', 2) AS FLOAT)                       AS "{p}_mbgl_max",
+            CAST(SPLIT_PART("mbgl", ' -', 1) AS FLOAT)
+                AS "{p}_mbgl_min",
+            CAST(SPLIT_PART("mbgl", ' -', 2) AS FLOAT)
+                AS "{p}_mbgl_max",
 
             -- per_cm "X-Y" -> aq_per_cm_min, aq_per_cm_max
-            CAST(SPLIT_PART("per_cm", '-', 1) AS FLOAT)                      AS "{p}_per_cm_min",
-            CAST(SPLIT_PART("per_cm", '-', 2) AS FLOAT)                      AS "{p}_per_cm_max",
+            CAST(SPLIT_PART("per_cm", '-', 1) AS FLOAT)
+                AS "{p}_per_cm_min",
+            CAST(SPLIT_PART("per_cm", '-', 2) AS FLOAT)
+                AS "{p}_per_cm_max",
 
             -- yeild__ "X%-Y%" -> aq_yeild__min, aq_yeild__max
-            CAST(REPLACE(SPLIT_PART("yeild__", '-', 1), '%', '') AS FLOAT)   AS "{p}_yeild__min",
-            CAST(REPLACE(SPLIT_PART("yeild__", '-', 2), '%', '') AS FLOAT)   AS "{p}_yeild__max",
+            CAST(REPLACE(SPLIT_PART("yeild__", '-', 1), '%', '') AS FLOAT)
+                AS "{p}_yeild__min",
+            CAST(REPLACE(SPLIT_PART("yeild__", '-', 2), '%', '') AS FLOAT)
+                AS "{p}_yeild__max",
 
             -- zone_m "X-Y" -> aq_zone_m_min, aq_zone_m_max
-            CAST(SPLIT_PART("zone_m", '-', 1) AS FLOAT)                      AS "{p}_zone_m_min",
-            CAST(SPLIT_PART("zone_m", '-', 2) AS FLOAT)                      AS "{p}_zone_m_max"
+            CAST(SPLIT_PART("zone_m", '-', 1) AS FLOAT)
+                AS "{p}_zone_m_min",
+            CAST(SPLIT_PART("zone_m", '-', 2) AS FLOAT)
+                AS "{p}_zone_m_max"
 
         FROM ST_READ('{file_path}')
         -- id and newcode43 are simply never selected above, so they are dropped.
@@ -455,7 +494,9 @@ def transform_aquifer(con, file_path, prefix="aq"):
 # ---------------------------------------------------------------------------
 
 
-def transform_deltaG_fortnight(con, file_path, prefix="dw"):
+def transform_deltaG_fortnight(
+    con: duckdb.DuckDBPyConnection, file_path: str, prefix: str = "dw"
+) -> str:
     """
     Load and transform the deltaG_fortnight layer.
 
@@ -506,7 +547,9 @@ def transform_deltaG_fortnight(con, file_path, prefix="dw"):
 # ---------------------------------------------------------------------------
 
 
-def transform_deltaG_well_depth(con, file_path, prefix="df"):
+def transform_deltaG_well_depth(
+    con: duckdb.DuckDBPyConnection, file_path: str, prefix: str = "df"
+) -> str:
     """
     Load and transform the deltaG_well_depth layer.
 
@@ -556,7 +599,9 @@ def transform_deltaG_well_depth(con, file_path, prefix="df"):
 # ---------------------------------------------------------------------------
 
 
-def transform_cluster(con, file_path, prefix="tc"):
+def transform_cluster(
+    con: duckdb.DuckDBPyConnection, file_path: str, prefix: str = "tc"
+) -> str:
     """
     Load and transform the cluster layer.
 
@@ -585,7 +630,9 @@ def transform_cluster(con, file_path, prefix="tc"):
 # ---------------------------------------------------------------------------
 
 
-def transform_intensity(con, file_path, prefix="ci"):
+def transform_intensity(
+    con: duckdb.DuckDBPyConnection, file_path: str, prefix: str = "ci"
+) -> str:
     """
     Load and transform the intensity layer.
 
@@ -614,7 +661,9 @@ def transform_intensity(con, file_path, prefix="ci"):
 # ---------------------------------------------------------------------------
 
 
-def transform_soge(con, file_path, prefix="sg"):
+def transform_soge(
+    con: duckdb.DuckDBPyConnection, file_path: str, prefix: str = "sg"
+) -> str:
     """
     Load and transform the soge layer.
 
@@ -652,7 +701,9 @@ TRANSFORM_DISPATCH = {
 }
 
 
-def transform_all_layers(con, file_info):
+def transform_all_layers(
+    con: duckdb.DuckDBPyConnection, file_info: dict[str, dict[str, str]]
+) -> dict[str, str]:
     """
     Run the layer-specific transform for each discovered file.
 
@@ -674,7 +725,11 @@ def transform_all_layers(con, file_info):
 # ===========================================================================
 
 
-def merge_on_mws_id(con, tables, output_table="merged_data"):
+def merge_on_mws_id(
+    con: duckdb.DuckDBPyConnection,
+    tables: dict[str, str],
+    output_table: str = "merged_data",
+) -> str:
     """
     INNER JOIN all transformed tables on uid, producing a final table where:
 
@@ -748,7 +803,9 @@ def merge_on_mws_id(con, tables, output_table="merged_data"):
 # ===========================================================================
 
 
-def export_to_parquet(con, table_name, output_file):
+def export_to_parquet(
+    con: duckdb.DuckDBPyConnection, table_name: str, output_file: str
+) -> None:
     """
     Write the DuckDB table to a single Parquet file.
     """
@@ -764,7 +821,7 @@ def export_to_parquet(con, table_name, output_file):
 # ===========================================================================
 
 
-def main():
+def main() -> None:
     folder_path = get_folder_path()
 
     if not os.path.isdir(folder_path):
@@ -794,7 +851,7 @@ def main():
 # ===========================================================================
 
 
-def clean_parquet(manual_path=None):
+def clean_parquet(manual_path: str | None = None) -> None:
     folder_path = get_folder_path(manual_path)
 
     if not os.path.isdir(folder_path):

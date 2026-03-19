@@ -3,10 +3,17 @@
 Provides the :class:`S3Handler` class which wraps common S3 operations
 (upload, download, list, delete) using *boto3* with an async-style
 interface.
+
+Credentials (``aws_access_key_id``, ``aws_secret_access_key``) and the
+AWS region are sourced from :data:`src.utils.configs.settings` (populated
+from ``.env`` or real environment variables) so no secrets are hard-coded
+or passed at call sites.
 """
 
 import boto3
 import boto3.session
+
+from src.utils.configs import settings
 
 
 class S3Handler:
@@ -16,44 +23,45 @@ class S3Handler:
     uploading, downloading, listing, and deleting objects in a single
     S3 bucket.
 
+    Credentials and region are taken from
+    :data:`~src.utils.configs.settings`.
+
     Attributes:
         _bucket_name: Name of the target S3 bucket.
         _session: Cached boto3 session instance.
-        _region: AWS region for the session (defaults to ``us-east-1``).
     """
 
     _bucket_name: str | None = None
     _session: boto3.Session | None = None
-    _region: str | None = None
 
-    def __init__(self, bucket_name: str, region: str | None) -> None:
+    def __init__(self, bucket_name: str) -> None:
         """Initialise the S3Handler.
 
         Args:
             bucket_name: Name of the S3 bucket to operate on.
-            region: AWS region name. Defaults to ``us-east-1`` when
-                ``None``.
 
         Raises:
-            ValueError: If *bucket_name* is ``None``.
+            ValueError: If *bucket_name* is empty or ``None``.
         """
-        if bucket_name is None:
+        if not bucket_name:
             raise ValueError("bucket_name must be provided")
-        if region is None:
-            self._region = "us-east-1"
-        else:
-            self._region = region
         self._bucket_name = bucket_name
 
     async def _get_session(self) -> boto3.Session:
         """Return the cached boto3 session, creating it if necessary.
 
         Returns:
-            A :class:`boto3.Session` configured with the handler's
-            region.
+            A :class:`boto3.Session` configured with credentials and
+            region from :data:`~src.utils.configs.settings`.
         """
         if self._session is None:
-            self._session = boto3.session.Session(region_name=self._region)
+            self._session = boto3.session.Session(
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=(
+                    settings.aws_secret_access_key.get_secret_value()
+                ),
+                region_name=settings.aws_region,
+            )
         return self._session
 
     async def upload_file(self, file_path: str, key: str) -> None:
