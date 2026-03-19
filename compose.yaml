@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: workers.dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
     develop:
       watch:
         - action: rebuild
@@ -12,6 +17,8 @@ services:
     build:
       context: .
       dockerfile: app.dockerfile
+    env_file:
+      - .env
     ports:
       - 8000:80
     depends_on:

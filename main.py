@@ -43,7 +43,7 @@ async def read_root() -> dict[str, str]:
     }
 
 
-@app.get(path="api/v1/status")
+@app.get(path="/api/v1/status")
 async def get_jobstatus(task_id: str) -> dict[str, str]:
     return get_status(task_id)
 
