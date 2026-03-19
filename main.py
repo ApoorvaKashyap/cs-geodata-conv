@@ -4,6 +4,7 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI
+from loguru import logger
 
 from src.routers.geojson import router as geojson_router
 from src.utils.checks import check_redis_connection, check_worker_status
@@ -15,6 +16,7 @@ app = FastAPI()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, Any]:
     # Startup tasks
+    logger.add("/var/logs/converter.logs")
     yield
     # Shutdown tasks
 
