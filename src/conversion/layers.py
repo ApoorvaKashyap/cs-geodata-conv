@@ -1,7 +1,7 @@
 from loguru import logger
 
-from src.app.models import LayerConversionRequest
 from src.conversion.algos import mws
+from src.models.vector_models import LayerConversionRequest
 
 # from src.utils.rand_funcs import sim_work
 from src.work.work_queue import lq
@@ -19,7 +19,7 @@ def handle_layers(request: LayerConversionRequest) -> dict:
 def layer_conversion(request: LayerConversionRequest) -> None:
     logger.info("Converting layers to a different format")
     try:
-        mws.clean_parquet(request.filepath)
+        mws.clean_parquet(request.location)
     except Exception as e:
         logger.error(f"Error in layer conversion: {e}")
         raise

@@ -1,6 +1,6 @@
 from loguru import logger
 
-from src.app.models import IDConversionRequest
+from src.models.vector_models import IDConversionRequest
 from src.utils.rand_funcs import sim_work
 from src.work.work_queue import iq
 

@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     aws_secret_access_key: SecretStr = SecretStr("")
     aws_region: str = "us-east-1"
 
+    # DuckDB
+    duckdb_path: str = ":memory:"
+    duckdb_type: str = "memory"
+    duckdb_extensions: list[str] = ["httpfs", "spatial"]
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

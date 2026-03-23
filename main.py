@@ -16,7 +16,7 @@ app = FastAPI()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, Any]:
     # Startup tasks
-    logger.add("/var/logs/converter.logs")
+    logger.add("logs/converter.logs")
     yield
     # Shutdown tasks
 

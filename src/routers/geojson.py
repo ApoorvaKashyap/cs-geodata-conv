@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
-from src.app.models import IDConversionRequest, LayerConversionRequest
 from src.conversion.id import handle_id
 from src.conversion.layers import handle_layers
+from src.models.vector_models import IDConversionRequest, LayerConversionRequest
 
 router = APIRouter(prefix="/vector", tags=["vector"])
 

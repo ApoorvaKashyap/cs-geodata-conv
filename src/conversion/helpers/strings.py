@@ -2,6 +2,20 @@ from decimal import Decimal
 from typing import Any
 
 
+def generate_prefixes(layers: list[str]) -> list[str]:
+    prefixes = []
+    for layer in layers:
+        if "_" in layer:
+            temp = layer.split("_")
+            prefixes.append(temp[0][0] + temp[1][0])
+        elif "-" in layer:
+            temp = layer.split("-")
+            prefixes.append(temp[0][0] + temp[1][0])
+        else:
+            prefixes.append(layer[0:2])
+    return prefixes
+
+
 def split_func(strategy: str, type: str, values: list[str]) -> list[tuple[Any, Any]]:
     splits = []
     match strategy:

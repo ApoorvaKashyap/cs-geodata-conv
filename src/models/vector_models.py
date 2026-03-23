@@ -21,7 +21,9 @@ class LayerConversionRequest(BaseModel):
         | Annotated[str, Query(pattern="^s3://([^/]+)/(.*?([^/]+)/?)$")]
         | None
     ) = Field(description="The location to save the converted layers.", default=None)
-    layers: set[str] = Field(description="The set of layers to convert.", default=set())
+    layers: set[str] = Field(
+        description="The set of layers to convert. Ex: {'aquifer.json'}", default=set()
+    )
     column_map: dict[str, column_mapping] = Field(
         description="The column mapping for each layer.", default_factory=dict
     )
@@ -34,6 +36,13 @@ class LayerConversionRequest(BaseModel):
     use_previous_mapping: bool = Field(
         description="Whether to use the previously provided column mapping.",
         default=False,
+    )
+    base_layer: str = Field(
+        description="The base layer to use for the conversion.", default=""
+    )
+    key: str = Field(
+        description="The key to use for joining the layers for conversion.",
+        default="uid",
     )
 
 
